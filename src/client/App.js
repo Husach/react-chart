@@ -1,15 +1,14 @@
-import React, { Component } from 'react';
-import {withStyles} from "@material-ui/core";
+import React, { Component, Fragment } from 'react';
 import Line from "./line";
 import '../css/App.css';
 import Bar from "./bar";
+import { Snackbar } from '@material-ui/core';
+import { withStyles } from "@material-ui/core";
 
 const socket = require('socket.io-client')('http://localhost:3001');
 
 const styles = theme => ({
-    "chart-container": {
-        height: 800
-    }
+    "chart-container": { height: 400 }
 });
 
 class App extends Component {
@@ -54,20 +53,21 @@ class App extends Component {
             },
             axisX: {
                 title: "Amount",
-                reversed: true,
             },
             axisY: {
                 title: "Range",
                 labelFormatter: function (e) {
                     return e.value;
                 }
-                // labelFormatter: this.addSymbols
             },
             data: [{
                 type: "bar",
                 dataPoints: []
             }]
-        }
+        },
+        lastValue: '',
+        inputValue: '',
+        isShowSnackBar: false
    };
 
    componentWillMount() {
@@ -81,10 +81,23 @@ class App extends Component {
        socket.on('data', (data) => {
            this.setLineData(data);
            this.setBarData(data, 0);
+           this.compareValue(data.value);
        });
        socket.on('disconnect', function () {
            console.log("disconnect")
        });
+   }
+
+   compareValue(lastValue) {
+       debugger;
+       if (this.state.inputValue && lastValue > this.state.inputValue) {
+           this.setState({
+               lastValue,
+               isShowSnackBar: true
+           });
+       } else {
+           this.setState({ isShowSnackBar: false });
+       }
    }
 
    setLineData(data) {
@@ -131,27 +144,46 @@ class App extends Component {
        }
    }
 
-   handlerModeClick = () => {
-       this.setState({isLineMode: !this.state.isLineMode})
-   };
+   handlerInput(event) {
+       const inputValue = +event.target.value;
+       this.setState({inputValue})
+   }
+
+   renderHeader() {
+       return (
+           <div className="header">
+               <input
+                   className="input"
+                   type="number"
+                   placeholder="Введите граничное значение"
+                   value={this.state.inputValue}
+                   onChange={this.handlerInput.bind(this)}
+               />
+               <Snackbar
+                   anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+                   open={this.state.isShowSnackBar}
+                   message={`Рандомное число с сервера - ${parseInt(this.state.lastValue)}, оно превышает введённый вами порог - ${this.state.inputValue}`}
+               />
+           </div>
+       )
+   }
 
    renderContent() {
-       if (this.state.isLineMode) {
-           return <Line classes={this.props.classes}
-                        data={this.state.lineChartData}
-                        options={this.state.lineChartOptions}/>
-       }
-       return <Bar options={this.state.barChartOptions}/>
+       return (
+           <Fragment>
+               <Line classes={this.props.classes}
+                     data={this.state.lineChartData}
+                     options={this.state.lineChartOptions}/>
+
+               <Bar options={this.state.barChartOptions}/>
+           </Fragment>
+       )
    }
 
    render() {
-       console.log('dataPoints', this.state.barChartOptions);
-
        return (
            <div className="App">
-               <button className="btn-mode" onClick={this.handlerModeClick}>
-                   Change line/bar mode
-               </button>
+               { this.renderHeader()}
                { this.renderContent()}
            </div>
        );
